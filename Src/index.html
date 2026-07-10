@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NoteAuto - note自動下書き保存ツール</title>
+  <!-- Google Fonts Outfit & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Outfit:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="glass-container">
+    <header class="app-header">
+      <h1 id="main-title">NoteAuto 🚀</h1>
+      <p class="subtitle">noteの自動下書き保存・DX管理コンソール</p>
+    </header>
+
+    <main class="app-content">
+      <section class="card form-card">
+        <h2>✍️ 下書きのアップロード</h2>
+        <p class="description">ローカルにあるMarkdownファイル（.md）の絶対パスを指定して、noteに自動で下書き保存します。</p>
+        
+        <div class="input-group">
+          <label for="file-path-input">下書きファイルの絶対パス</label>
+          <input type="text" id="file-path-input" placeholder="G:\マイドライブ\Vault_of_Heaven\03_Journal\Monetization\Note\note_draft.md" value="G:\マイドライブ\Vault_of_Heaven\03_Journal\Monetization\Note\note_draft.md">
+        </div>
+
+        <button id="btn-interact" class="btn btn-primary">
+          <span class="btn-text">下書きの自動作成を実行</span>
+          <span class="spinner hidden"></span>
+        </button>
+      </section>
+
+      <section class="card status-card">
+        <h2>📊 実行ステータス</h2>
+        <div id="display-message" class="status-message">待機中... パスを指定して実行ボタンを押してください。</div>
+        
+        <div id="preview-area" class="preview-area hidden">
+          <h3>📸 保存完了プレビュー</h3>
+          <p>noteのエディタ画面で自動保存が正常に完了しました。</p>
+          <div class="screenshot-wrapper">
+            <img id="screenshot-img" src="" alt="保存完了スクリーンショット">
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <p>&copy; 2026 Agy先生. All rights reserved.</p>
+    </footer>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

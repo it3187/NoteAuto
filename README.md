@@ -1,35 +1,40 @@
-# NoteAuto - note自動下書き保存ツール
+# NoteAuto - note自動下書き保存コンソール
 
-このツールは、ローカルで記述したMarkdown形式の記事下書きを、noteの編集エディタ（`https://editor.note.com/new`）に自動で貼り付けて下書き保存するPythonスクリプトです。
+このツールは、ローカルで記述したMarkdown形式の記事下書きを、noteの編集エディタ（`https://editor.note.com/new`）に自動で貼り付けて下書き保存するWebアプリケーションです。
+美しいWebコンソール画面（UI）から、ローカルのMarkdownファイルパスを指定してワンクリックで自動アップロードを実行できます。
 
 ---
 
 ## 📦 セットアップ方法
 
 1. **必要なライブラリのインストール**:
-   以下のコマンドを実行して、Playwrightおよびマークダウンパーサーをインストールします。
+   以下のコマンドを実行して、フロントエンドおよびバックエンドのNode.jsパッケージをインストールします。
    ```bash
-   pip install -r requirements.txt
+   npm install
    ```
 
 2. **Playwrightのブラウザ初期化**:
    Playwright用のChromiumブラウザ本体をインストールします。
    ```bash
-   playwright install chromium
+   npx playwright install chromium
    ```
 
 ---
 
-## 🚀 使い方
+## 🚀 使い方（起動コマンド）
 
-以下のコマンドを実行すると、ヘッドフルブラウザが起動し、自動でnoteのエディター画面を開いて下書きをアップロードします。
+以下のコマンドを実行すると、ローカル開発サーバー（Vite + Express API）が同時に立ち上がります。
 
 ```bash
-python note_uploader.py --draft "G:\マイドライブ\Vault_of_Heaven\03_Journal\Monetization\Note\note_draft.md"
+npm run dev
 ```
 
+1. 起動後、ブラウザで **`http://localhost:5173`** にアクセスします。
+2. 画面上の入力フォームに、アップロードしたいMarkdownファイルの絶対パス（例: `G:\マイドライブ\Vault_of_Heaven\03_Journal\Monetization\Note\note_draft.md`）を入力します。
+3. **「下書きの自動作成を実行」** ボタンをクリックします。
+
 ### 🔐 初回起動時の注意（ログインセッションの保存）
-- 初回起動時、noteにログインしていない場合はブラウザがログイン画面で停止します。
+- 初回起動時、noteにログインしていない場合は、自動的に開いたChromeブラウザ上にログイン画面が表示されます。
 - ブラウザ上で手動でメールログイン ＆ セキュリティ認証（reCAPTCHA）を完了させてください。
-- ログインが完了してエディタ画面が表示されたら、ターミナル上で **`ENTER`** キーを押すと、自動入力処理が再開されます。
+- ログインが完了してエディタ画面が表示されると、**スクリプトが自動的にログイン完了を検知して、タイトルと本文の流し込みを再開します。**
 - ログイン状態（Cookieやセッション）はローカルの `data/chrome_profile` フォルダ内に保存されるため、**2回目以降は認証なしで完全に自動で下書き保存が実行されます。**

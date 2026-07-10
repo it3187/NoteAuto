@@ -1,0 +1,20 @@
+{
+  "name": "note-auto",
+  "version": "1.0.0",
+  "description": "Auto draft uploader for note.com with beautiful WebUI",
+  "main": "server.js",
+  "scripts": {
+    "dev": "concurrently \"node server.js\" \"vite\"",
+    "start": "node server.js",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "playwright": "^1.44.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "vite": "^5.2.11"
+  }
+}
