@@ -17,34 +17,282 @@
       <p class="subtitle">noteの自動下書き保存・DX管理コンソール</p>
     </header>
 
+    <!-- タブナビゲーションメニュー (CDD) -->
+    <nav class="tab-navigation">
+      <button id="tab-pipeline" class="tab-btn active">📝 記事生成・校正</button>
+      <button id="tab-upload" class="tab-btn">📤 下書き保存</button>
+      <button id="tab-slop" class="tab-btn">🕵️ AI-Slop検知</button>
+    </nav>
+
     <main class="app-content">
-      <section class="card form-card">
-        <h2>✍️ 下書きのアップロード</h2>
-        <p class="description">ローカルにあるMarkdownファイル（.md）の絶対パスを指定して、noteに自動で下書き保存します。</p>
-        
-        <div class="input-group">
-          <label for="file-path-input">下書きファイルの絶対パス</label>
-          <input type="text" id="file-path-input" placeholder="G:\マイドライブ\Vault_of_Heaven\03_Journal\Monetization\Note\note_draft.md" value="G:\マイドライブ\Vault_of_Heaven\03_Journal\Monetization\Note\note_draft.md">
+      <!-- ⓪ 記事生成・校正パイプラインタブのコンテンツ (CDD) -->
+      <div id="content-pipeline" class="tab-pane active">
+        <div class="tab-pane-grid">
+          <section class="card form-card">
+            <h2>📝 記事の自動生成・校正</h2>
+            <p class="description">テーマとキーワードを入力するだけで、記事生成 -> AI-Slopスキャン -> 校正リライトまでワンクリックで自動実行します。</p>
+
+            <div class="input-group">
+              <label for="pipeline-theme">記事のテーマ（必須）</label>
+              <input type="text" id="pipeline-theme" placeholder="例: Pythonによる業務自動化の進め方">
+            </div>
+
+            <div class="input-group">
+              <label for="pipeline-keywords">キーワード（任意、カンマ区切り）</label>
+              <input type="text" id="pipeline-keywords" placeholder="例: Python, 自動化, 業務効率化, RPA">
+            </div>
+
+            <div class="input-row">
+              <div class="input-group input-half">
+                <label for="pipeline-target">ターゲット層（任意）</label>
+                <input type="text" id="pipeline-target" placeholder="例: IT初心者の会社員">
+              </div>
+              <div class="input-group input-half">
+                <label for="pipeline-wordcount">文字数の目安</label>
+                <input type="text" id="pipeline-wordcount" placeholder="2000" value="2000">
+              </div>
+            </div>
+
+            <button id="btn-pipeline-run" class="btn btn-primary btn-lg">
+              <span class="btn-text">記事の自動生成 & 校正を開始</span>
+              <span class="spinner hidden"></span>
+            </button>
+          </section>
+
+          <section class="card status-card">
+            <h2>⚙️ パイプライン進捗</h2>
+
+            <!-- Stepper UI -->
+            <div class="pipeline-stepper">
+              <div class="step" id="step-generate">
+                <div class="step-icon">1</div>
+                <div class="step-label">記事生成</div>
+              </div>
+              <div class="step-connector"></div>
+              <div class="step" id="step-scan">
+                <div class="step-icon">2</div>
+                <div class="step-label">スロップ判定</div>
+              </div>
+              <div class="step-connector"></div>
+              <div class="step" id="step-proofread">
+                <div class="step-icon">3</div>
+                <div class="step-label">校正リライト</div>
+              </div>
+              <div class="step-connector"></div>
+              <div class="step" id="step-final-scan">
+                <div class="step-icon">4</div>
+                <div class="step-label">最終判定</div>
+              </div>
+              <div class="step-connector"></div>
+              <div class="step" id="step-done">
+                <div class="step-icon">✓</div>
+                <div class="step-label">完了</div>
+              </div>
+            </div>
+
+            <!-- Progress Bar (CDD) -->
+            <div class="pipeline-progress-container">
+              <div class="progress-bar-wrapper">
+                <div id="pipeline-progress-bar" class="pipeline-progress-bar" style="width: 0%"></div>
+              </div>
+              <span id="pipeline-progress-text" class="pipeline-progress-text">0%</span>
+            </div>
+
+            <div id="pipeline-status" class="status-message">待機中... テーマを入力して「開始」を押してください。</div>
+
+            <!-- AI-Slop Score Mini Display (Before ➔ After Twin Display) -->
+            <div id="pipeline-score-mini" class="pipeline-score-mini hidden">
+              <div class="score-comparison-wrapper">
+                <div class="score-comparison-box">
+                  <span class="score-comparison-label">スロップ点数</span>
+                  <div class="mini-score-circle score-before-circle" id="pipeline-circle-before">
+                    <span id="pipeline-score-val-before">0</span><span class="mini-score-max">/50</span>
+                  </div>
+                </div>
+                <div class="score-comparison-arrow">➔</div>
+                <div class="score-comparison-box">
+                  <span class="score-comparison-label">最終点数 (校正後)</span>
+                  <div class="mini-score-circle score-after-circle" id="pipeline-circle-after">
+                    <span id="pipeline-score-val-after">0</span><span class="mini-score-max">/50</span>
+                  </div>
+                </div>
+              </div>
+              <div class="score-comparison-status-panel">
+                <strong id="pipeline-score-status">-</strong>
+                <p id="pipeline-score-desc">スキャン結果がここに表示されます。</p>
+              </div>
+            </div>
+          </section>
         </div>
 
-        <button id="btn-interact" class="btn btn-primary">
-          <span class="btn-text">下書きの自動作成を実行</span>
-          <span class="spinner hidden"></span>
-        </button>
-      </section>
+        <!-- Results Section (full width below the grid) -->
+        <div id="pipeline-results" class="pipeline-results hidden">
+          <div class="results-split">
+            <div class="card result-panel">
+              <h2>🔍 AI-Slopスキャン結果</h2>
+              <div id="pipeline-scan-summary" class="description">ここに総合フィードバックが表示されます。</div>
+              <div id="pipeline-issues-list" class="suggestions-container"></div>
+            </div>
+            <div class="card result-panel editor-panel">
+              <h2>✏️ 校正済み原稿（編集可能）</h2>
+              <textarea id="pipeline-editor" class="pipeline-editor" placeholder="校正済みの原稿がここに表示されます..."></textarea>
+            </div>
+          </div>
 
-      <section class="card status-card">
-        <h2>📊 実行ステータス</h2>
-        <div id="display-message" class="status-message">待機中... パスを指定して実行ボタンを押してください。</div>
-        
-        <div id="preview-area" class="preview-area hidden">
-          <h3>📸 保存完了プレビュー</h3>
-          <p>noteのエディタ画面で自動保存が正常に完了しました。</p>
-          <div class="screenshot-wrapper">
-            <img id="screenshot-img" src="" alt="保存完了スクリーンショット">
+          <div class="card save-action-card">
+            <div class="save-action-inner">
+              <div>
+                <h2>🚀 NOTE に下書き & ローカルに保存</h2>
+                <p class="description">上のエディタの内容を <code>data/drafts/</code> に保存し、同時に note.com に下書き保存します。</p>
+              </div>
+              <button id="btn-pipeline-save" class="btn btn-primary btn-save">
+                <span class="btn-text">下書き保存を実行</span>
+                <span class="spinner hidden"></span>
+              </button>
+            </div>
+            <div id="pipeline-save-status" class="status-message hidden"></div>
           </div>
         </div>
-      </section>
+      </div>
+
+      <!-- ① 下書きアップロードタブのコンテンツ (CDD) -->
+      <div id="content-upload" class="tab-pane hidden">
+        <div class="tab-pane-grid">
+          <section class="card form-card">
+            <h2>✍️ 下書きのアップロード</h2>
+            <p class="description">ローカルにあるMarkdownファイル（.md）の絶対パスを指定して、noteに自動で下書き保存します。</p>
+            
+            <div class="input-group">
+              <label for="file-path-input">下書きファイルの絶対パス</label>
+              <input type="text" id="file-path-input" placeholder="G:\マイドライブ\Vault_of_Heaven\01_Projects\Noteauto\Drafts\note_draft.md" value="G:\マイドライブ\Vault_of_Heaven\01_Projects\Noteauto\Drafts\note_draft.md">
+            </div>
+
+            <button id="btn-interact" class="btn btn-primary">
+              <span class="btn-text">下書きの自動作成を実行</span>
+              <span class="spinner hidden"></span>
+            </button>
+          </section>
+
+          <section class="card status-card">
+            <h2>📊 実行ステータス</h2>
+            <div id="display-message" class="status-message">待機中... パスを指定して実行ボタンを押してください。</div>
+            
+            <div id="preview-area" class="preview-area hidden">
+              <h3>📸 保存完了プレビュー</h3>
+              <p>noteのエディタ画面で自動保存が正常に完了しました。</p>
+              <div class="screenshot-wrapper">
+                <img id="screenshot-img" src="" alt="保存完了スクリーンショット">
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- ② AI-Slop検知タブのコンテンツ (CDD) -->
+      <div id="content-slop" class="tab-pane hidden">
+        <div class="tab-pane-grid">
+          <section class="card form-card">
+            <h2>🕵️ AI-Slopスキャン</h2>
+            <p class="description">stop-ai-slop-jp の基準で日本語の文章を解析し、AI臭さを洗い出して改善案を提示します。</p>
+            
+            <div class="input-group">
+              <label for="slop-file-path">スキャンするファイルのパス（任意）</label>
+              <input type="text" id="slop-file-path" placeholder="G:\マイドライブ\Vault_of_Heaven\01_Projects\Noteauto\Drafts\note_draft.md" value="G:\マイドライブ\Vault_of_Heaven\01_Projects\Noteauto\Drafts\note_draft.md">
+            </div>
+
+            <div class="input-group">
+              <label for="slop-text-input">または、テキストを直接入力</label>
+              <textarea id="slop-text-input" placeholder="AIが作成した下書きをここに貼り付けてもスキャンできます..."></textarea>
+            </div>
+
+            <button id="btn-scan" class="btn btn-primary">
+              <span class="btn-text">AI臭をスキャンする</span>
+              <span class="spinner hidden"></span>
+            </button>
+          </section>
+
+          <section class="card status-card">
+            <h2>📊 判定結果</h2>
+            <div id="slop-display-message" class="status-message">待機中... テキストを入力するかパスを指定して「スキャンする」を押してください。</div>
+
+            <!-- スコア表示メーター (CDD) -->
+            <div id="slop-score-area" class="slop-score-area hidden">
+              <div class="score-container">
+                <div class="score-radial">
+                  <span id="slop-score-val">0</span>
+                  <span class="score-max">/50</span>
+                </div>
+                <div class="score-label">
+                  <h3 id="slop-status-title">良好</h3>
+                  <p id="slop-status-desc">人間らしい自然な表現です。</p>
+                </div>
+              </div>
+
+              <!-- 5軸評価インジケーター (CDD) -->
+              <div class="axes-container">
+                <h3>5軸評価（stop-ai-slop-jp基準）</h3>
+                <div class="axis-row">
+                  <span class="axis-name">立場</span>
+                <div class="axis-bar-bg"><div id="bar-立場" class="axis-bar-fill" style="width: 0%"></div></div>
+                  <span id="val-立場" class="axis-val">0</span>
+                </div>
+                <div class="axis-row">
+                  <span class="axis-name">リズム</span>
+                  <div class="axis-bar-bg"><div id="bar-リズム" class="axis-bar-fill" style="width: 0%"></div></div>
+                  <span id="val-リズム" class="axis-val">0</span>
+                </div>
+                <div class="axis-row">
+                  <span class="axis-name">主体性</span>
+                  <div class="axis-bar-bg"><div id="bar-主体性" class="axis-bar-fill" style="width: 0%"></div></div>
+                  <span id="val-主体性" class="axis-val">0</span>
+                </div>
+                <div class="axis-row">
+                  <span class="axis-name">具体性</span>
+                  <div class="axis-bar-bg"><div id="bar-具体性" class="axis-bar-fill" style="width: 0%"></div></div>
+                  <span id="val-具体性" class="axis-val">0</span>
+                </div>
+                <div class="axis-row">
+                  <span class="axis-name">削減</span>
+                  <div class="axis-bar-bg"><div id="bar-削減" class="axis-bar-fill" style="width: 0%"></div></div>
+                  <span id="val-削減" class="axis-val">0</span>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- AI詳細分析コメントとBefore/After (CDD) -->
+        <div id="slop-details-area" class="slop-details-area hidden">
+          <div class="card comment-card">
+            <h2>📝 総合分析フィードバック</h2>
+            <p id="slop-summary-text" class="description">ここに総合フィードバックが表示されます。</p>
+          </div>
+
+          <div class="card local-warnings-card">
+            <h2>⚠️ 検出されたAI偏愛語・定型表現（ローカルスキャン）</h2>
+            <div id="local-warnings-list" class="warnings-grid">
+              <!-- JSで動的生成 -->
+            </div>
+          </div>
+
+          <div class="card suggestions-card">
+            <h2>💡 具体的な改善・書き換え提案</h2>
+            <div id="suggestions-list" class="suggestions-container">
+              <!-- JSで動的生成 -->
+            </div>
+          </div>
+          
+          <!-- Auto-Rewrite Button Section -->
+          <div class="card rewrite-action-card">
+            <h2>🤖 ワンクリック自動書き直し</h2>
+            <p class="description">AIの提案をすべて適用し、自然な日本語に全体を書き直して別名保存（_rewritten.md）します。</p>
+            <button id="btn-auto-rewrite" class="btn-primary mt-4">
+              <span class="btn-text">✨ 提案を適用して自動書き直し</span>
+            </button>
+            <div id="rewrite-status" class="mt-2 status-message hidden"></div>
+          </div>
+        </div>
+      </div>
     </main>
 
     <footer class="app-footer">

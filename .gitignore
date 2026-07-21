@@ -1,5 +1,8 @@
 node_modules/
 data/
 dist/
-last_draft_screenshot.png
-Src/public/last_upload.png
+.env
+*.html
+*.png
+!Src/public/last_upload.png
+!Src/public/last_pipeline_upload.png
