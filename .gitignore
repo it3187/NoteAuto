@@ -2,7 +2,9 @@ node_modules/
 data/
 dist/
 .env
-*.html
 *.png
 !Src/public/last_upload.png
 !Src/public/last_pipeline_upload.png
+editor_debug*.html
+debug_e2e_*.png
+error_*.png

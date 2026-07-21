@@ -235,83 +235,47 @@ ${text}
 }
 
 // ==============================================================================
-// 4. Gemini API 連携による自動リライト (CDD)
+// 4. Build system instructions for rewrite prompt (CDD)
 // ==============================================================================
-// 検出された課題（issues）をもとに、AIにテキスト全体をリライトさせます。
-async function autoRewriteWithGemini(text, apiKey, issues, modelName = 'gemini-2.5-pro') {
-  // 軽量ルールファイルを優先的に読み込むことでトークン数を大幅に節約する (CDD)
+// Loads slop rule files and constructs the system instructions string.
+// The actual API call is delegated to geminiService.js.
+function buildRewriteSystemInstructions() {
   const lightRulesPath = path.resolve(__dirname, 'slop_rules_light.txt');
   const skillPath = path.resolve(__dirname, 'stop-ai-slop-jp', 'SKILL.md');
   const structuresPath = path.resolve(__dirname, 'stop-ai-slop-jp', 'references', 'structures.md');
-  
-  let systemInstructions = 'You are an expert Japanese editor specializing in removing AI-Slop from articles. Your task is to rewrite the entire provided text so that it sounds natural, human-written, and fixes the specific issues provided. Output ONLY the raw rewritten markdown text, with no introductory or concluding remarks, no markdown code block fences (like ```), just the text itself.';
-  
+
+  let systemInstructions =
+    'You are an expert Japanese editor specializing in removing AI-Slop from articles. ' +
+    'Your task is to rewrite the entire provided text so that it sounds natural, human-written, ' +
+    'and fixes the specific issues provided. Output ONLY the raw rewritten markdown text, ' +
+    'with no introductory or concluding remarks, no markdown code block fences (like ```), just the text itself.';
+
   try {
     if (fs.existsSync(lightRulesPath)) {
-      systemInstructions += '\n\nHere are the core rules for removing AI-Slop from Japanese text. You MUST strictly comply with these rules:\n' + fs.readFileSync(lightRulesPath, 'utf-8');
+      systemInstructions +=
+        '\n\nHere are the core rules for removing AI-Slop from Japanese text. You MUST strictly comply with these rules:\n' +
+        fs.readFileSync(lightRulesPath, 'utf-8');
     } else {
       if (fs.existsSync(skillPath)) {
-        systemInstructions += '\n\nHere is the guide file (SKILL.md) for stop-ai-slop-jp. You MUST strictly comply with its rules and standards (avoid AI-ish cliches, maintain natural tone, write with clear author stance):\n' + fs.readFileSync(skillPath, 'utf-8');
+        systemInstructions +=
+          '\n\nHere is the guide file (SKILL.md) for stop-ai-slop-jp. You MUST strictly comply with its rules and standards:\n' +
+          fs.readFileSync(skillPath, 'utf-8');
       }
       if (fs.existsSync(structuresPath)) {
-        systemInstructions += '\n\nHere is the structural patterns reference (structures.md):\n' + fs.readFileSync(structuresPath, 'utf-8');
+        systemInstructions +=
+          '\n\nHere is the structural patterns reference (structures.md):\n' +
+          fs.readFileSync(structuresPath, 'utf-8');
       }
     }
   } catch (err) {
     console.error('Failed to load rules for rewrite prompt:', err);
   }
 
-  // issuesを文字列化
-  const issuesText = (issues || []).map((i, idx) => `課題${idx + 1}: [${i.type}] 「${i.original}」 -> ${i.reason}。\n提案: ${i.suggested}`).join('\n\n');
-
-  const prompt = `
-以下のテキストは、AI特有の不自然な表現（AI-Slop）が含まれています。
-読み込んでいる stop-ai-slop-jp のコアルールおよび採点基準を厳格に満たすように、指摘された課題をすべて解消し、文脈や元々の意味・トーンを維持したまま、人間が書いたような自然で読みやすい日本語に全文を書き直してください。
-
-■ 指摘された課題
-${issuesText || '特になし。全体のAI臭をなくすように自然にリライトしてください。'}
-
-■ 対象のテキスト
-${text}
-
-出力ルール:
-書き直したテキストの全文のみを出力してください。Markdownのコードブロック記号（\`\`\`）や「以下が書き直したテキストです」などの前置きは一切含めないでください。
-`;
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-  
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      systemInstruction: { parts: [{ text: systemInstructions }] }
-    })
-  });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Gemini API error (${response.status}): ${errText}`);
-  }
-
-  const resJson = await response.json();
-  try {
-    let rewrittenText = resJson.candidates[0].content.parts[0].text;
-    // Remove markdown fences if Gemini still added them
-    if (rewrittenText.startsWith('```markdown')) {
-      rewrittenText = rewrittenText.replace(/^```markdown\n?/, '').replace(/\n?```$/, '').trim();
-    } else if (rewrittenText.startsWith('```')) {
-      rewrittenText = rewrittenText.replace(/^```\w*\n?/, '').replace(/\n?```$/, '').trim();
-    }
-    return rewrittenText;
-  } catch (err) {
-    console.error('Failed to parse Gemini rewrite response:', err, resJson);
-    throw new Error('Geminiからのリライト結果の取得に失敗しました。');
-  }
+  return systemInstructions;
 }
 
 module.exports = {
   scanTextLocal,
   analyzeWithGemini,
-  autoRewriteWithGemini
+  buildRewriteSystemInstructions
 };

@@ -9,6 +9,7 @@
     "build": "vite build"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.0",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "express": "^4.19.2",

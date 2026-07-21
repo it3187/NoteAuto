@@ -46,6 +46,7 @@ def parse_args():
     parser.add_argument("--wordcount", type=int, default=2000, help="文字数の目安")
     parser.add_argument("--upload", action="store_true", help="note.comに下書き自動アップロードを行う")
     parser.add_argument("--no-upload", action="store_true", help="note.comへのアップロードをスキップし、ローカル保存のみにする")
+    parser.add_argument("--mock", action="store_true", help="Gemini APIを使わずに tests/fixtures/mock_article.md のダミーデータでテスト走行する")
     return parser.parse_args()
 
 def main():
@@ -61,7 +62,7 @@ def main():
         print("エラー: バックエンドサーバーが起動していません。")
         print("server.js をポート3000で起動してから再実行してください。")
         sys.exit(1)
-    print("➔ 接続成功！")
+    print("-> OK!")
 
     # 2. Get User Inputs (either from args or interactive prompt)
     theme = args.theme
@@ -70,18 +71,19 @@ def main():
     word_count = args.wordcount
     upload = None
 
+    if args.mock and not theme:
+        theme = "Mock Article Test"
+
     if args.upload:
         upload = True
     elif args.no_upload:
         upload = False
 
-    # Interactive Fallback if parameters not provided via command line arguments
     if not theme:
-        print("\n--- 記事パラメータの入力 (対話モード) ---")
-        theme = input("■ 記事のテーマ (必須): ").strip()
-        if not theme:
-            print("テーマは必須入力です。終了します。")
-            sys.exit(1)
+        print("テーマは必須入力です。終了します。")
+        sys.exit(1)
+    
+    if not args.theme and not args.mock:
         keywords = input("■ キーワード (任意、カンマ区切り): ").strip()
         target = input("■ ターゲット層 (任意): ").strip()
         word_count_str = input("■ 文字数の目安 (デフォルト 2000): ").strip()
@@ -97,87 +99,99 @@ def main():
     print(" パイプライン実行中... (途中で終了しないでください)")
     print("=" * 40)
 
-    # Step 1: Generate Article
-    print("\n[Step 1/4] 記事を生成中 (Gemini)...")
-    gen_res = call_api("/api/generate-base-article", {
-        "theme": theme,
-        "keywords": keywords,
-        "target": target,
-        "wordCount": word_count
-    })
-    if "error" in gen_res:
-        print(f"エラー: 記事の生成に失敗しました。 {gen_res['error']}")
-        sys.exit(1)
-    article_text = gen_res["article"]
-    print("➔ 記事生成完了！")
-
-    print("Gemini API レートリミット回避のため、12秒間スリープします...")
-    time.sleep(12)
-
-    # Step 2: First Slop Scan
-    print("\n[Step 2/4] スロップ判定を実行中...")
-    scan_res1 = call_api("/api/detect-slop", {"text": article_text})
-    print(f"DEBUG scan_res1 response: {scan_res1}")
-    if "error" in scan_res1:
-        print(f"エラー: スキャンに失敗しました。 {scan_res1['error']}")
-        sys.exit(1)
-    
-    ai_analysis = scan_res1.get("aiAnalysis")
-    if ai_analysis:
-        before_score = ai_analysis.get("score", "N/A")
-        issues = ai_analysis.get("issues", [])
+    if args.mock:
+        print("\n★ [MOCK MODE] Gemini API呼び出しを完全スキップします。")
+        mock_file = os.path.join(os.path.dirname(__file__), "..", "tests", "fixtures", "mock_article.md")
+        if not os.path.exists(mock_file):
+            print(f"エラー: モックファイルが存在しません: {mock_file}")
+            sys.exit(1)
+        with open(mock_file, "r", encoding="utf-8") as f:
+            rewritten_text = f.read()
+        print(f"-> Mock article loaded: {mock_file}")
+        before_score = "N/A (Mock)"
+        after_score = "N/A (Mock)"
     else:
-        print("警告: AI-Slopスキャン結果が空のため、ローカル判定結果のみを使用します。")
-        before_score = "N/A (制限によりスキップ)"
-        issues = [match.get("description", "問題点あり") for match in scan_res1.get("localMatches", [])]
+        # Step 1: Generate Article
+        print("\n[Step 1/4] 記事を生成中 (Gemini)...")
+        gen_res = call_api("/api/generate-base-article", {
+            "theme": theme,
+            "keywords": keywords,
+            "target": target,
+            "wordCount": word_count
+        })
+        if "error" in gen_res:
+            print(f"エラー: 記事の生成に失敗しました。 {gen_res['error']}")
+            sys.exit(1)
+        article_text = gen_res["article"]
+        print("-> Article generated!")
+
+        print("Gemini API レートリミット回避のため、12秒間スリープします...")
+        time.sleep(12)
+
+        # Step 2: First Slop Scan
+        print("\n[Step 2/4] スロップ判定を実行中...")
+        scan_res1 = call_api("/api/detect-slop", {"text": article_text})
+        print(f"DEBUG scan_res1 response: {scan_res1}")
+        if "error" in scan_res1:
+            print(f"エラー: スキャンに失敗しました。 {scan_res1['error']}")
+            sys.exit(1)
         
-    print(f"➔ 初回スロップ点数: {before_score}/50 点")
+        ai_analysis = scan_res1.get("aiAnalysis")
+        if ai_analysis:
+            before_score = ai_analysis.get("score", "N/A")
+            issues = ai_analysis.get("issues", [])
+        else:
+            print("警告: AI-Slopスキャン結果が空のため、ローカル判定結果のみを使用します。")
+            before_score = "N/A (制限によりスキップ)"
+            issues = [match.get("description", "問題点あり") for match in scan_res1.get("localMatches", [])]
+            
+        print(f"➔ 初回スロップ点数: {before_score}/50 点")
 
-    print("Gemini API レートリミット回避のため、12秒間スリープします...")
-    time.sleep(12)
+        print("Gemini API レートリミット回避のため、12秒間スリープします...")
+        time.sleep(12)
 
-    # Step 3: Rewrite Slop
-    print("\n[Step 3/4] ルール同期型校正リライトを実行中...")
-    rewrite_res = call_api("/api/rewrite-slop", {
-        "text": article_text,
-        "issues": issues
-    })
-    if "error" in rewrite_res:
-        print(f"エラー: 校正リライトに失敗しました。 {rewrite_res['error']}")
-        sys.exit(1)
-    
-    rewritten_text = rewrite_res["rewrittenText"]
-    print("➔ 校正リライト完了！")
-
-    # テスト走行用：ダミー画像プレースホルダーを本文に2箇所自動で挿入
-    sections = rewritten_text.split("\n## ")
-    if len(sections) >= 3:
-        sections[1] = "\n[IMAGE_PLACEHOLDER:Src/public/last_pipeline_upload.png]\n\n" + sections[1]
-        sections[2] = "\n[IMAGE_PLACEHOLDER:error_screenshot.png]\n\n" + sections[2]
-        rewritten_text = "\n## ".join(sections)
-        print("★ [DEBUG] テスト走行用の画像プレースホルダー2枚を本文の各章見出し直前に挿入しました。")
-
-    print("Gemini API レートリミット回避のため、12秒間スリープします...")
-    time.sleep(12)
-
-    # Step 4: Final Slop Scan
-    print("\n[Step 4/4] 最終判定を実行中...")
-    scan_res2 = call_api("/api/detect-slop", {"text": rewritten_text})
-    if "error" in scan_res2:
-        print(f"エラー: 最終スキャンに失敗しました。 {scan_res2['error']}")
-        sys.exit(1)
-    
-    ai_analysis2 = scan_res2.get("aiAnalysis")
-    if ai_analysis2:
-        after_score = ai_analysis2.get("score", "N/A")
-    else:
-        after_score = "N/A (制限によりスキップ)"
+        # Step 3: Rewrite Slop
+        print("\n[Step 3/4] ルール同期型校正リライトを実行中...")
+        rewrite_res = call_api("/api/rewrite-slop", {
+            "text": article_text,
+            "issues": issues
+        })
+        if "error" in rewrite_res:
+            print(f"エラー: 校正リライトに失敗しました。 {rewrite_res['error']}")
+            sys.exit(1)
         
-    print(f"➔ 最終点数 (校正後): {after_score}/50 点")
-    if isinstance(before_score, int) and isinstance(after_score, int):
-        print(f"★ 改善スコア: {before_score}点 ➔ {after_score}点 (差分: +{after_score - before_score}点)")
-    else:
-        print(f"★ 改善スコア: {before_score} ➔ {after_score}")
+        rewritten_text = rewrite_res["rewrittenText"]
+        print("-> Rewrite completed!")
+
+        # テスト走行用：ダミー画像プレースホルダーを本文に2箇所自動で挿入
+        sections = rewritten_text.split("\n## ")
+        if len(sections) >= 3:
+            sections[1] = "\n[IMAGE_PLACEHOLDER:Src/public/last_pipeline_upload.png]\n\n" + sections[1]
+            sections[2] = "\n[IMAGE_PLACEHOLDER:error_screenshot.png]\n\n" + sections[2]
+            rewritten_text = "\n## ".join(sections)
+            print("★ [DEBUG] テスト走行用の画像プレースホルダー2枚を本文の各章見出し直前に挿入しました。")
+
+        print("Gemini API レートリミット回避のため、12秒間スリープします...")
+        time.sleep(12)
+
+        # Step 4: Final Slop Scan
+        print("\n[Step 4/4] 最終判定を実行中...")
+        scan_res2 = call_api("/api/detect-slop", {"text": rewritten_text})
+        if "error" in scan_res2:
+            print(f"エラー: 最終スキャンに失敗しました。 {scan_res2['error']}")
+            sys.exit(1)
+        
+        ai_analysis2 = scan_res2.get("aiAnalysis")
+        if ai_analysis2:
+            after_score = ai_analysis2.get("score", "N/A")
+        else:
+            after_score = "N/A (制限によりスキップ)"
+            
+        print(f"-> Final score (after rewrite): {after_score}/50")
+        if isinstance(before_score, int) and isinstance(after_score, int):
+            print(f"* Improvement: {before_score} -> {after_score} (diff: +{after_score - before_score})")
+        else:
+            print(f"* Improvement: {before_score} -> {after_score}")
 
     # Print summary
     print("\n" + "=" * 40)
@@ -213,7 +227,7 @@ def main():
         if "error" in save_res:
             print(f"エラー: ローカル保存に失敗しました。 {save_res['error']}")
         else:
-            print(f"➔ ローカルに保存しました: {save_res['localFilePath']}")
+            print(f"-> Saved locally: {save_res['localFilePath']}")
 
     print("\nすべての処理が終了しました。")
 
